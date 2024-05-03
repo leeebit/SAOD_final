@@ -1,0 +1,314 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Graph Visualization</title>
+<style>
+body {
+    font-family: Arial, sans-serif;
+    margin: 0;
+    padding: 0;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    height: 100vh;
+    background-color: #f4f4f4;
+}
+
+#mynetwork {
+    width: 600px;
+    height: 400px;
+    border: 1px solid lightgray;
+    margin-bottom: 20px;
+}
+
+.input-container {
+    margin-bottom: 20px;
+    margin-top: 20px;
+}
+
+input[type="radio"] {
+    margin-right: 10px;
+}
+
+textarea {
+    width: 100%;
+    margin-bottom: 10px;
+    padding: 8px;
+    border-radius: 4px;
+    border: 1px solid #ccc;
+    resize: vertical;
+}
+
+button {
+    margin-bottom: 5px;
+    padding: 10px 20px;
+    border: none;
+    border-radius: 4px;
+    background-color:#0096fa;
+    color: white;
+    cursor: pointer;
+    transition: background-color 0.3s;
+}
+
+button:hover {
+    background-color: #003afa;
+}
+
+#buttonControls, #matrixControls, #incidentMatrixControls {
+    display: block;
+}
+
+#matrixControls, #incidentMatrixControls {
+    display: none;
+}
+
+#message {
+    margin-top: 10px;
+}
+</style>
+<script src="https://unpkg.com/vis-network/standalone/umd/vis-network.min.js"></script>
+</head>
+<body>
+<div class="input-container">
+<input type="radio" id="modeButtons" name="mode" value="buttons" checked>
+<label for="modeButtons">Кнопки</label>
+<input type="radio" id="modeMatrix" name="mode" value="matrix">
+<label for="modeMatrix">Матрица смежности</label>
+<input type="radio" id="modeIncidentMatrix" name="mode" value="incidentMatrix">
+<label for="modeIncidentMatrix">Матрица инцидентности</label>
+</div>
+<div id="buttonControls">
+<button onclick="if(validateAction('addNode')) addNode()">Добавить вершину</button>
+<button onclick="if(validateAction('removeNodes')) removeSelectedNodes()">Удалить выбранные вершины</button>
+<button onclick="if(validateAction('clearSelected')) clearSelected()">Сбросить выбор</button>
+<button onclick="if(validateAction('addEdge')) addEdge()">Добавить ребро</button>
+<button onclick="if(validateAction('removeEdge')) removeSelectedEdge()">Удалить выбранное ребро</button>
+<button onclick="if(validateAction('clearGraph')) clearGraph()">Очистить граф</button>
+</div>
+<div id="matrixControls">
+<textarea id="adjacencyMatrix" rows="5" cols="30" placeholder="Введите матрицу смежности"></textarea>
+<button onclick="if(validateAction('updateGraphAdjacencyMatrix')) updateGraphByAdjacencyMatrix()">Обновить граф</button>
+</div>
+<div id="incidentMatrixControls">
+<textarea id="incidentMatrix" rows="5" cols="30" placeholder="Введите матрицу инцидентности"></textarea>
+<button onclick="if(validateAction('updateGraphIncidentMatrix')) updateGraphByIncidentMatrix()">Обновить граф</button>
+</div>
+<div id="mynetwork"></div>
+<div id="message"></div>
+<script>
+var container = document.getElementById('mynetwork');
+var nodes = new vis.DataSet();
+var edges = new vis.DataSet();
+var data = {
+    nodes: nodes,
+    edges: edges
+};
+var options = {
+    layout: {
+        randomSeed: 2,
+    },
+    physics: {
+        enabled: false
+    }
+};
+var network = new vis.Network(container, data, options);
+
+var selectedNodes = [];
+var adjacencyMatrix = '';
+var incidentMatrix = '';
+
+network.on("click", function (params) {
+    var nodeId = params.nodes[0];
+    if (nodeId !== undefined) {
+        if (selectedNodes.length < 2) {
+            if (!selectedNodes.includes(nodeId)) {
+                selectedNodes.push(nodeId);
+                network.selectNodes(selectedNodes);
+            }
+        } else {
+            selectedNodes = [];
+            selectedNodes.push(nodeId);
+            network.selectNodes(selectedNodes);
+        }
+    }
+});
+
+function showMessage(message) {
+    var messageDiv = document.getElementById('message');
+    messageDiv.textContent = message;
+}
+
+function validateAction(action) {
+    // Добавьте свои проверки действий здесь
+    // Например, можно проверить, есть ли выбранные вершины перед удалением
+    // Или можно добавить проверку для других действий
+    switch (action) {
+        case 'removeNodes':
+            if (network.getSelection().nodes.length === 0) {
+                alert("Выберите вершины для удаления.");
+                return false;
+            }
+            break;
+        case 'addEdge':
+            if (selectedNodes.length !== 2) {
+                alert("Выберите две вершины для добавления ребра.");
+                return false;
+            }
+            break;
+        case 'removeEdge':
+            if (network.getSelection().edges.length !== 1) {
+                alert("Выберите только одно ребро для удаления.");
+                return false;
+            }
+            break;
+        // Добавьте другие проверки по необходимости
+    }
+    return true;
+}
+
+var nodeIdCounter = 1;
+function addNode() {
+    var selectedNodes = network.getSelection().nodes;
+    if (selectedNodes.length > 0) {
+        nodes.remove(selectedNodes);
+    }
+    
+    // Используем текущее значение счетчика как идентификатор для новой вершины
+    var newNodeId = nodeIdCounter++;
+
+    // Позиционируем вершину в центре контейнера
+    var pos = network.DOMtoCanvas({x: container.offsetWidth / 2, y: container.offsetHeight / 2});
+    
+    // Добавляем вершину
+    nodes.add({id: newNodeId, label: 'Node ' + newNodeId, x: pos.x, y: pos.y});
+    
+    // Показываем сообщение об успешном добавлении вершины
+    showMessage("Вершина успешно добавлена: " + newNodeId);
+}
+
+function removeSelectedNodes() {
+    var selectedNodes = network.getSelection().nodes;
+    if (selectedNodes.length > 0) {
+        nodes.remove(selectedNodes);
+        showMessage("Выбранные вершины успешно удалены.");
+    }
+}
+
+function clearSelected() {
+    selectedNodes = [];
+    network.unselectAll();
+    showMessage("Выбор успешно сброшен.");
+}
+
+function isEdgeExists(fromNodeId, toNodeId) {
+var edgesIds = edges.getIds();
+for (var i = 0; i < edgesIds.length; i++) {
+    var edge = edges.get(edgesIds[i]);
+    if ((edge.from === fromNodeId && edge.to === toNodeId) || (edge.from === toNodeId && edge.to === fromNodeId)) {
+        return true;
+    }
+}
+return false;
+}
+
+function addEdge() {
+    if (selectedNodes.length === 2) {
+        var fromNodeId = selectedNodes[0];
+        var toNodeId = selectedNodes[1];
+        if (!isEdgeExists(fromNodeId, toNodeId)) {
+            var edgeId = getUniqueId(edges);
+            edges.add({id: edgeId, from: fromNodeId, to: toNodeId});
+            showMessage("Ребро успешно добавлено: " + edgeId);
+        }
+        clearSelected();
+    }
+}
+
+function removeSelectedEdge() {
+    var selectedEdges = network.getSelection().edges;
+    if (selectedEdges.length === 1) {
+        edges.remove(selectedEdges);
+        showMessage("Выбранное ребро успешно удалено.");
+    }
+}
+
+function clearGraph() {
+    nodes.clear();
+    edges.clear();
+    showMessage("Граф успешно очищен.");
+}
+
+function getUniqueId(dataset) {
+    var id = 1;
+    while (dataset.get(id)) {
+        id++;
+    }
+    return id;
+}
+
+function updateGraphByIncidentMatrix() {
+    var incidentMatrixText = document.getElementById('incidentMatrix').value;
+    var incidentMatrixRows = incidentMatrixText.trim().split('\n');
+
+    nodes.clear();
+    edges.clear();
+
+    // Добавляем вершины
+    for (var i = 0; i < incidentMatrixRows[0].trim().split(/\s+/).length; i++) {
+        nodes.add({id: i + 1, label: 'Node ' + (i + 1)});
+    }
+
+    // Добавляем рёбра
+    for (var j = 0; j < incidentMatrixRows[0].trim().split(/\s+/).length; j++) {
+        var connectedNodes = [];
+        for (var k = 0; k < incidentMatrixRows.length; k++) {
+            var value = parseInt(incidentMatrixRows[k].trim().split(/\s+/)[j]);
+            if (value === 1) {
+                connectedNodes.push(k + 1);
+            }
+            else if (value === -1) {
+                connectedNodes.push(-(k + 1)); // Обратное направление ребра
+            }
+        }
+
+        if (connectedNodes.length === 2) {
+            var fromNodeId = Math.abs(connectedNodes[0]);
+            var toNodeId = Math.abs(connectedNodes[1]);
+            if (!isEdgeExists(fromNodeId, toNodeId)) {
+                var edgeId = getUniqueId(edges);
+                edges.add({id: edgeId, from: fromNodeId, to: toNodeId});
+                showMessage("Ребро успешно добавлено: " + edgeId);
+            }
+        }
+    }
+
+    incidentMatrix = incidentMatrixText;
+    network.fit(); // Перерисовываем граф
+}
+
+
+// Обработчик изменения режима работы
+document.getElementsByName('mode').forEach(function(el) {
+    el.addEventListener('change', function() {
+        var mode = this.value;
+        if (mode === 'buttons') {
+            document.getElementById('buttonControls').style.display = 'block';
+            document.getElementById('matrixControls').style.display = 'none';
+            document.getElementById('incidentMatrixControls').style.display = 'none';
+        } else if (mode === 'matrix') {
+            document.getElementById('buttonControls').style.display = 'none';
+            document.getElementById('matrixControls').style.display = 'block';
+            document.getElementById('incidentMatrixControls').style.display = 'none';
+        } else if (mode === 'incidentMatrix') {
+            document.getElementById('buttonControls').style.display = 'none';
+            document.getElementById('matrixControls').style.display = 'none';
+            document.getElementById('incidentMatrixControls').style.display = 'block';
+        }
+    });
+});
+</script>
+</body>
+</html>
